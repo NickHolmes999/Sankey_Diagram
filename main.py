@@ -4,10 +4,12 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import *
 from tkinter import StringVar, OptionMenu, Label, Button, Text
+import matplotlib.colors as mcolors
 import webbrowser
 import random
 import plotly.graph_objects as go
 from plotly.offline import plot
+import re
 
 
 
@@ -47,53 +49,48 @@ with open('output.csv', 'w', newline='') as csvfile:
     writer = csv.writer(csvfile, quoting=csv.QUOTE_NONNUMERIC)
     for row in output_data_sorted:
         writer.writerow(row)
-def retrieve_user_paths():
+def retrieve_user_paths(df):
     grouped_df = df.groupby('ID')
-    user_paths = [list(group['Event']) for _, group in grouped_df]
+    user_paths = [{'id': _, 'name': group['Name'].iat[0], 'path': list(group['Event'])} for _, group in grouped_df]
     return user_paths
 
 
-def generate_nodes_links():
+
+def generate_nodes_links(user_paths):
     nodes = []
-    links = {'source': [], 'target': [], 'value': [], 'label': [], 'data': []}
+    links = {'source': [], 'target': [], 'value': [], 'label': [], 'customdata': [], 'color':[]}
 
-    user_paths = retrieve_user_paths()
+    colors = list(mcolors.CSS4_COLORS.keys())  # Get a list of available color names
+    color_dict = {}  # Create an empty dictionary to store unique colors for each path
 
-    for event_path in user_paths:
-        path_str = '-'.join(event_path)
+    for user in user_paths:
+        path_str = '-'.join(user['path'])
 
-        for i in range(len(event_path) - 1):
-            if event_path[i] not in nodes:
-                nodes.append(event_path[i])
+        if path_str not in color_dict.keys():  # If this path doesn't have a unique color assigned
+            color_dict[path_str] = colors.pop()  # Assign and remove one from the list
 
-            if event_path[i + 1] not in nodes:
-                nodes.append(event_path[i + 1])
+        for i in range(len(user['path']) - 1):
+            if user['path'][i] not in nodes:
+                nodes.append(user['path'][i])
 
-            links['source'].append(nodes.index(event_path[i]))
-            links['target'].append(nodes.index(event_path[i + 1]))
+            if user['path'][i + 1] not in nodes:
+                nodes.append(user['path'][i + 1])
+
+            links['source'].append(nodes.index(user['path'][i]))
+            links['target'].append(nodes.index(user['path'][i + 1]))
             links['value'].append(1)
             links['label'].append(path_str)
-
-    # Count unique paths and store in "data"
-    links['data'] = pd.Series(links['label']).value_counts().to_dict()
+            links['customdata'].append(f"ID: {user['id']}<br>Name: {user['name']}")
+            links['color'].append(color_dict[path_str])  # Add the color to the link
 
     return nodes, links
 
 
+
 # Create a Sankey Diagram
-def create_sankey():
-    nodes, links = generate_nodes_links()
-
-    # Generate a unique color for each unique label in the data
-    unique_labels = set(links['label'])
-    colors = [f'hsl({i / len(unique_labels) * 360}, 50%, 50%)' for i in range(len(unique_labels))]
-    color_dict = dict(zip(unique_labels, colors))
-
-    # Assign corresponding colors to each link
-    link_colors = [color_dict[label] for label in links['label']]
-
-    # Convert dictionary 'links['data']' to a list of strings 'Path: Count'
-    customdata_list = [f"{path}: {count}" for path, count in links['data'].items()]
+def create_sankey(df):
+    user_paths = retrieve_user_paths(df)
+    nodes, links = generate_nodes_links(user_paths)
 
     data = go.Sankey(
         node=dict(
@@ -102,38 +99,53 @@ def create_sankey():
             line=dict(color="black", width=0.5),
             label=nodes,
             color="blue",
-            hovertemplate='ID: %{customdata}<br>Name: %{label}<extra></extra>',
-            customdata=nodes  # Added ID as customdata
         ),
         link=dict(
             source=links['source'],
             target=links['target'],
             value=links['value'],
-            color=link_colors,
-            hovertemplate='<b>%{label}<b>',  # Added hover template
-            customdata=customdata_list  # Add the unique path count as customdata
+            color=links['color'], # Set link color
+            hovertemplate='Link from node %{source.label}<br />' +
+                          'to node %{target.label} has value %{value}<br />' +
+                          '%{customdata}<extra></extra>',
+            customdata=links['customdata'],
         )
     )
+    # Step 1: Compute the unique path occurrences
+    paths = df.groupby('EventPath')['ID'].nunique().sort_values(ascending=False)
 
-    # Add insight box
-    insight_text = '<br>'.join(f'{path}: {count}' for path, count in links['data'].items())
-    annotations = [
-        go.layout.Annotation(
-            showarrow=False,
-            text=insight_text,
-            xanchor='right',
-            x=1,
-            yanchor='top',
-            y=1,
-         ),
-    ]
+    # Step 2: Extract the top 5 unique event paths
+    top5_paths = paths.head(5)
 
-    layout = go.Layout(title="Sankey Diagram", font=dict(size=10), annotations=annotations)
+    # Prepare top 5 paths for annotation
+    annotations = []
+
+
+
+
+
+    for i, (path, count) in enumerate(top5_paths.items()):
+        # Insert dashes between events in 'path'. Assumes events always start with a capital letter.
+        dashed_path = re.sub(r"(?<=\w)([A-Z])", r"-\1", path)
+
+        annotations.append(
+            dict(
+                text=f"Path: {dashed_path}, Count: {count}",
+                xref="paper", yref="paper",
+                x=0.95, y=(1 - 0.1 * i),  # Positions to stack annotations nicely
+                showarrow=False
+            )
+        )
+    layout = go.Layout(title_text="Sankey Diagram", font_size=10, annotations=annotations)
     fig = go.Figure(data=data, layout=layout)
+
+
     fig.show()
 
 
-print("Hello")
+
+
+
 
 class Application:
     def __init__(self, master):
@@ -173,7 +185,7 @@ class Application:
         self.results_text.tag_configure("result", background="white", foreground="green")
         self.results_text.tag_configure("separator", background="white", foreground="blue")
 
-        self.sankey_button = Button(self.master, text="Show Sankey Diagram", command=create_sankey)
+        self.sankey_button = Button(self.master, text="Show Sankey Diagram", command=lambda: create_sankey(df))
         self.sankey_button.pack()
 
         # Control variable for the End In mode
@@ -224,19 +236,3 @@ class Application:
 root = tk.Tk()
 app = Application(root)
 root.mainloop()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
