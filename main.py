@@ -5,11 +5,17 @@ import tkinter as tk
 from tkinter import *
 from tkinter import StringVar, OptionMenu, Label, Button, Text
 import matplotlib.colors as mcolors
-import webbrowser
-import random
+import sys
+from PyQt5.QtWidgets import QApplication, QPushButton, QVBoxLayout, QWidget, QComboBox, QLabel, QTextEdit
 import plotly.graph_objects as go
 from plotly.offline import plot
 import re
+from folium.plugins import HeatMap
+import folium
+from io import BytesIO
+import base64
+import numpy as np
+from geopy.geocoders import Nominatim
 
 
 
@@ -49,6 +55,11 @@ with open('output.csv', 'w', newline='') as csvfile:
     writer = csv.writer(csvfile, quoting=csv.QUOTE_NONNUMERIC)
     for row in output_data_sorted:
         writer.writerow(row)
+
+##########################################################################################################
+
+
+##########################################################################################################
 def retrieve_user_paths(df):
     grouped_df = df.groupby('ID')
     user_paths = [{'id': _, 'name': group['Name'].iat[0], 'path': list(group['Event'])} for _, group in grouped_df]
@@ -145,11 +156,16 @@ def create_sankey(df):
 
 
 
-
+##########################################################################################################
+# Create a new DataFrame from the rows containing 'summary'
+purchase_data = df[df['Event'] == 'summary'].copy()
+geolocator = Nominatim(user_agent="geoapiExercises")
 
 class Application:
-    def __init__(self, master):
+    def __init__(self, master, geolocator, purchase_data):
         self.master = master
+        self.geolocator = geolocator
+        self.purchase_data = purchase_data
         self.search_path = []
         self.search_label_string = StringVar()
         self.search_label = Label(master, textvariable=self.search_label_string)
@@ -174,8 +190,6 @@ class Application:
         self.end_in_button.configure(relief="raised")
         self.end_in_button.pack()
 
-
-
         self.search_button = Button(master, text="Search", command=self.search)
         self.search_button.pack()
 
@@ -188,8 +202,18 @@ class Application:
         self.sankey_button = Button(self.master, text="Show Sankey Diagram", command=lambda: create_sankey(df))
         self.sankey_button.pack()
 
+        self.heatmap_button = Button(master, text="Show Heatmap", command=self.create_map)
+        self.heatmap_button.pack()
+
         # Control variable for the End In mode
         self.end_in_mode = False
+
+        # Geolocate the purchase data
+        purchase_data['Latitude'], purchase_data['Longitude'] = zip(
+            *purchase_data.apply(lambda row: self.geolocate(row['Country'], row['Region'], row['Mailing Address']), axis=1))
+
+        # Count the frequency of each location
+        self.location_counts = purchase_data.groupby(['Latitude', 'Longitude']).size().reset_index(name='Counts')
 
     def add_to_search_path(self):
         self.search_path.append(self.selected_option.get())
@@ -232,7 +256,57 @@ class Application:
             self.results_text.insert('end', str(result) + '\n', 'result')
         self.results_text.insert('end', '-' * 50 + '\n', 'separator')
 
+    def geolocate(self, country, region, address):
+        # Combine the address, region, and country
+        location_str = f"{address}, {region}, {country}"
+
+        # Geolocate the combined string
+        location = self.geolocator.geocode(location_str)
+
+        if location != None:
+            return location.latitude, location.longitude
+        else:
+            return np.nan, np.nan  # return NaN if location can't be found
+
+    def create_map(self):
+        self.location_counts['Latitude'] = pd.to_numeric(self.location_counts['Latitude'], errors='coerce')
+        self.location_counts['Longitude'] = pd.to_numeric(self.location_counts['Longitude'], errors='coerce')
+
+        # Calculate the mean latitude and longitude
+        mean_latitude = self.location_counts['Latitude'].mean(skipna=True)
+        mean_longitude = self.location_counts['Longitude'].mean(skipna=True)
+
+        # Check if the mean latitude and longitude are NaN
+        if pd.isna(mean_latitude) or pd.isna(mean_longitude):
+            # If they are NaN, set a default location
+            location = [0, 0]  # You can set your own default location here
+        else:
+            # If they are not NaN, use the mean latitude and longitude
+            location = [mean_latitude, mean_longitude]
+
+        # Create a folium map centered at the location
+        m = folium.Map(location=location, zoom_start=2)
+
+        # Add a heatmap to the map
+        HeatMap(data=self.location_counts[['Latitude', 'Longitude', 'Counts']].dropna(), radius=15).add_to(m)
+
+        # Convert the map to HTML
+        html = m._repr_html_()
+
+        # Convert the HTML to an image
+        with BytesIO() as file:
+            m.save(file, close_file=False)
+            image = base64.b64encode(file.getvalue()).decode('utf-8')
+
+        # Create a new tkinter window
+        new_window = tk.Toplevel()
+
+        # Load the image into the window
+
+        photo = tk.PhotoImage(data=image)
+        label = tk.Label(new_window, image=photo)
+        label.pack()
 
 root = tk.Tk()
-app = Application(root)
+app = Application(root, geolocator, purchase_data)
 root.mainloop()
