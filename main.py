@@ -1,3 +1,5 @@
+import PIL
+import time
 import pandas as pd
 import csv
 from datetime import datetime
@@ -12,10 +14,13 @@ from plotly.offline import plot
 import re
 from folium.plugins import HeatMap
 import folium
+import io
 from io import BytesIO
 import base64
 import numpy as np
 from geopy.geocoders import Nominatim
+from PIL import Image, ImageTk
+from selenium import webdriver
 
 
 
@@ -158,7 +163,7 @@ def create_sankey(df):
 
 ##########################################################################################################
 # Create a new DataFrame from the rows containing 'summary'
-purchase_data = df[df['Event'] == 'summary'].copy()
+purchase_data = df[df['Event'] == 'Summary'].copy()
 geolocator = Nominatim(user_agent="geoapiExercises")
 
 class Application:
@@ -209,8 +214,13 @@ class Application:
         self.end_in_mode = False
 
         # Geolocate the purchase data
-        purchase_data['Latitude'], purchase_data['Longitude'] = zip(
-            *purchase_data.apply(lambda row: self.geolocate(row['Country'], row['Region'], row['Mailing Address']), axis=1))
+        result = purchase_data.apply(
+            lambda row: self.geolocate(row['Country'], row['Region'], row['City'], row['Mailing Address']), axis=1)
+        result_list = list(zip(*result))
+        if result_list:
+            purchase_data['Latitude'], purchase_data['Longitude'] = result_list
+        else:
+            purchase_data['Latitude'], purchase_data['Longitude'] = np.nan, np.nan
 
         # Count the frequency of each location
         self.location_counts = purchase_data.groupby(['Latitude', 'Longitude']).size().reset_index(name='Counts')
@@ -256,17 +266,28 @@ class Application:
             self.results_text.insert('end', str(result) + '\n', 'result')
         self.results_text.insert('end', '-' * 50 + '\n', 'separator')
 
-    def geolocate(self, country, region, address):
-        # Combine the address, region, and country
-        location_str = f"{address}, {region}, {country}"
+    def geolocate(self, country, region, city, address):
+        # Check if any values are nan
+        if pd.isna(country) or pd.isna(region) or pd.isna(city) or pd.isna(address):
+            return np.nan, np.nan  # return NaN for rows with missing values
 
-        # Geolocate the combined string
-        location = self.geolocator.geocode(location_str)
+        # Combine the address, city, region, and country
+        location_str = f"{address}, {city}, {region}, {country}"
+        print(f"Geolocating: {location_str}")  # Debug print
 
-        if location != None:
-            return location.latitude, location.longitude
-        else:
-            return np.nan, np.nan  # return NaN if location can't be found
+        try:
+            time.sleep(5)  # Add a 1 second delay between each request
+            location = self.geolocator.geocode(location_str)
+
+            if location != None:
+                print(f"Found location: {location.latitude}, {location.longitude}")  # Debug print
+                return location.latitude, location.longitude
+            else:
+                print(f"No location found for {location_str}")  # Debug print
+                return np.nan, np.nan  # return NaN if location can't be found
+        except Exception as e:
+            print(f"Error geolocating {location_str}: {e}")
+            return np.nan, np.nan  # return NaN if there's an error
 
     def create_map(self):
         self.location_counts['Latitude'] = pd.to_numeric(self.location_counts['Latitude'], errors='coerce')
@@ -290,22 +311,32 @@ class Application:
         # Add a heatmap to the map
         HeatMap(data=self.location_counts[['Latitude', 'Longitude', 'Counts']].dropna(), radius=15).add_to(m)
 
-        # Convert the map to HTML
-        html = m._repr_html_()
+        # Save the map as an HTML file
+        m.save('map.html')
 
-        # Convert the HTML to an image
-        with BytesIO() as file:
-            m.save(file, close_file=False)
-            image = base64.b64encode(file.getvalue()).decode('utf-8')
+        # Set up a selenium driver
+        driver = webdriver.Safari()
+
+        # Load the HTML file
+        driver.get('file:///Users/nicholasholmes/PycharmProjects/pythonProject3/map.html')
+
+        # Capture a screenshot
+        driver.save_screenshot('map.png')
+
+        # Close the driver
+        driver.quit()
+
+        # Open the image file
+        image = Image.open('map.png')
 
         # Create a new tkinter window
         new_window = tk.Toplevel()
 
-        # Load the image into the window
-
-        photo = tk.PhotoImage(data=image)
+        # Convert the image to a format that Tkinter can recognize
+        photo = ImageTk.PhotoImage(image)
         label = tk.Label(new_window, image=photo)
         label.pack()
+
 
 root = tk.Tk()
 app = Application(root, geolocator, purchase_data)
