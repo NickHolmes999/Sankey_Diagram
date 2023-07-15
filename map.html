@@ -25,7 +25,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_6a041b384a1b39fb41744070b3e0e8b0 {
+                #map_a8fe11ae81e46864414561a384eb768b {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -40,18 +40,18 @@
 <body>
     
     
-            <div class="folium-map" id="map_6a041b384a1b39fb41744070b3e0e8b0" ></div>
+            <div class="folium-map" id="map_a8fe11ae81e46864414561a384eb768b" ></div>
         
 </body>
 <script>
     
     
-            var map_6a041b384a1b39fb41744070b3e0e8b0 = L.map(
-                "map_6a041b384a1b39fb41744070b3e0e8b0",
+            var map_a8fe11ae81e46864414561a384eb768b = L.map(
+                "map_a8fe11ae81e46864414561a384eb768b",
                 {
-                    center: [0.0, 0.0],
+                    center: [38.526043050000006, -77.22170278393341],
                     crs: L.CRS.EPSG3857,
-                    zoom: 2,
+                    zoom: 5,
                     zoomControl: true,
                     preferCanvas: false,
                 }
@@ -61,16 +61,64 @@
 
         
     
-            var tile_layer_9a96911d0f1ff48d5bea1582ed605709 = L.tileLayer(
+            var tile_layer_43b84a2d0c04fbc841f331ab9f5e7c9a = L.tileLayer(
                 "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {"attribution": "Data by \u0026copy; \u003ca target=\"_blank\" href=\"http://openstreetmap.org\"\u003eOpenStreetMap\u003c/a\u003e, under \u003ca target=\"_blank\" href=\"http://www.openstreetmap.org/copyright\"\u003eODbL\u003c/a\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
-            ).addTo(map_6a041b384a1b39fb41744070b3e0e8b0);
+            ).addTo(map_a8fe11ae81e46864414561a384eb768b);
         
     
-            var heat_map_570352704a3f6223160f7e105163dce5 = L.heatLayer(
-                [],
-                {"blur": 15, "maxZoom": 18, "minOpacity": 0.5, "radius": 15}
-            ).addTo(map_6a041b384a1b39fb41744070b3e0e8b0);
+            var tile_layer_1555945f4e2eff561477056d616bd500 = L.tileLayer(
+                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {"attribution": "Data by \u0026copy; \u003ca target=\"_blank\" href=\"http://openstreetmap.org\"\u003eOpenStreetMap\u003c/a\u003e, under \u003ca target=\"_blank\" href=\"http://www.openstreetmap.org/copyright\"\u003eODbL\u003c/a\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 0.85, "subdomains": "abc", "tms": false}
+            ).addTo(map_a8fe11ae81e46864414561a384eb768b);
+        
+    
+            var heat_map_8fe743aefd6bfca70f72850c55211e4c = L.heatLayer(
+                [[37.55577915, -77.45613435180024, 1.0], [39.010187, -77.10094, 1.0], [39.012163, -77.108034, 1.0]],
+                {"blur": 15, "maxZoom": 18, "minOpacity": 0.5, "radius": 8}
+            ).addTo(map_a8fe11ae81e46864414561a384eb768b);
+        
+    
+            var circle_marker_516a1ec56d1a96441dd4361bd088cfaf = L.circleMarker(
+                [37.55577915, -77.45613435180024],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 5, "stroke": true, "weight": 3}
+            ).addTo(map_a8fe11ae81e46864414561a384eb768b);
+        
+    
+            circle_marker_516a1ec56d1a96441dd4361bd088cfaf.bindTooltip(
+                `<div>
+                     Lat: 37.55577915, Lon: -77.45613435180024
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var circle_marker_1b0d2e507c55fb1aa34824c460f845f2 = L.circleMarker(
+                [39.010187, -77.10094],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 5, "stroke": true, "weight": 3}
+            ).addTo(map_a8fe11ae81e46864414561a384eb768b);
+        
+    
+            circle_marker_1b0d2e507c55fb1aa34824c460f845f2.bindTooltip(
+                `<div>
+                     Lat: 39.010187, Lon: -77.10094
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var circle_marker_4407501a38d5fdf0717b25e9f358da85 = L.circleMarker(
+                [39.012163, -77.108034],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 5, "stroke": true, "weight": 3}
+            ).addTo(map_a8fe11ae81e46864414561a384eb768b);
+        
+    
+            circle_marker_4407501a38d5fdf0717b25e9f358da85.bindTooltip(
+                `<div>
+                     Lat: 39.012163, Lon: -77.108034
+                 </div>`,
+                {"sticky": true}
+            );
         
 </script>
 </html>

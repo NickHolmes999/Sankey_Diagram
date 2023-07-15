@@ -21,7 +21,7 @@ import numpy as np
 from geopy.geocoders import Nominatim
 from PIL import Image, ImageTk
 from selenium import webdriver
-
+import webview
 
 
 
@@ -164,7 +164,7 @@ def create_sankey(df):
 ##########################################################################################################
 # Create a new DataFrame from the rows containing 'summary'
 purchase_data = df[df['Event'] == 'Summary'].copy()
-geolocator = Nominatim(user_agent="geoapiExercises")
+geolocator = Nominatim(user_agent="Nick-Holmes_Practice")
 
 class Application:
     def __init__(self, master, geolocator, purchase_data):
@@ -276,7 +276,7 @@ class Application:
         print(f"Geolocating: {location_str}")  # Debug print
 
         try:
-            time.sleep(5)  # Add a 1 second delay between each request
+            time.sleep(2)  # Add a 1 second delay between each request
             location = self.geolocator.geocode(location_str)
 
             if location != None:
@@ -306,10 +306,28 @@ class Application:
             location = [mean_latitude, mean_longitude]
 
         # Create a folium map centered at the location
-        m = folium.Map(location=location, zoom_start=2)
+        # Create a folium map centered at the location
+        m = folium.Map(location=location, zoom_start=5, zoom_control=True, tiles='OpenStreetMap')
+        tile = folium.TileLayer(tiles='OpenStreetMap', opacity=0.85)
+        tile.add_to(m)
+
+
+
 
         # Add a heatmap to the map
-        HeatMap(data=self.location_counts[['Latitude', 'Longitude', 'Counts']].dropna(), radius=15).add_to(m)
+        HeatMap(data=self.location_counts[['Latitude', 'Longitude', 'Counts']].dropna(), radius=8).add_to(m)
+
+        # Add markers to the map
+        # Add markers to the map
+        for index, row in self.location_counts.iterrows():
+            folium.CircleMarker(
+                location=[row['Latitude'], row['Longitude']],
+                radius=5,
+                color="red",
+                fill=True,
+                fill_color="red",
+                tooltip=f"Lat: {row['Latitude']}, Lon: {row['Longitude']}"
+            ).add_to(m)
 
         # Save the map as an HTML file
         m.save('map.html')
@@ -333,8 +351,8 @@ class Application:
         new_window = tk.Toplevel()
 
         # Convert the image to a format that Tkinter can recognize
-        photo = ImageTk.PhotoImage(image)
-        label = tk.Label(new_window, image=photo)
+        self.photo = ImageTk.PhotoImage(image)
+        label = tk.Label(new_window, image=self.photo)
         label.pack()
 
 
