@@ -289,6 +289,8 @@ class Application:
             print(f"Error geolocating {location_str}: {e}")
             return np.nan, np.nan  # return NaN if there's an error
 
+    import webview
+
     def create_map(self):
         self.location_counts['Latitude'] = pd.to_numeric(self.location_counts['Latitude'], errors='coerce')
         self.location_counts['Longitude'] = pd.to_numeric(self.location_counts['Longitude'], errors='coerce')
@@ -306,18 +308,13 @@ class Application:
             location = [mean_latitude, mean_longitude]
 
         # Create a folium map centered at the location
-        # Create a folium map centered at the location
         m = folium.Map(location=location, zoom_start=5, zoom_control=True, tiles='OpenStreetMap')
         tile = folium.TileLayer(tiles='OpenStreetMap', opacity=0.85)
         tile.add_to(m)
 
-
-
-
         # Add a heatmap to the map
         HeatMap(data=self.location_counts[['Latitude', 'Longitude', 'Counts']].dropna(), radius=8).add_to(m)
 
-        # Add markers to the map
         # Add markers to the map
         for index, row in self.location_counts.iterrows():
             folium.CircleMarker(
@@ -329,31 +326,12 @@ class Application:
                 tooltip=f"Lat: {row['Latitude']}, Lon: {row['Longitude']}"
             ).add_to(m)
 
-        # Save the map as an HTML file
-        m.save('map.html')
+        # Save the map as an HTML string
+        map_html = m._repr_html_()
 
-        # Set up a selenium driver
-        driver = webdriver.Safari()
-
-        # Load the HTML file
-        driver.get('file:///Users/nicholasholmes/PycharmProjects/pythonProject3/map.html')
-
-        # Capture a screenshot
-        driver.save_screenshot('map.png')
-
-        # Close the driver
-        driver.quit()
-
-        # Open the image file
-        image = Image.open('map.png')
-
-        # Create a new tkinter window
-        new_window = tk.Toplevel()
-
-        # Convert the image to a format that Tkinter can recognize
-        self.photo = ImageTk.PhotoImage(image)
-        label = tk.Label(new_window, image=self.photo)
-        label.pack()
+        # Create a new webview window with the map HTML
+        webview.create_window('Map', html=map_html)
+        webview.start()
 
 
 root = tk.Tk()
