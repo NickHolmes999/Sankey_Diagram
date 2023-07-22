@@ -4,24 +4,17 @@ import pandas as pd
 import csv
 from datetime import datetime
 import tkinter as tk
-from tkinter import *
 from tkinter import StringVar, OptionMenu, Label, Button, Text
 import matplotlib.colors as mcolors
-import sys
-from PyQt5.QtWidgets import QApplication, QPushButton, QVBoxLayout, QWidget, QComboBox, QLabel, QTextEdit
 import plotly.graph_objects as go
-from plotly.offline import plot
 import re
 from folium.plugins import HeatMap
 import folium
-import io
-from io import BytesIO
-import base64
 import numpy as np
 from geopy.geocoders import Nominatim
-from PIL import Image, ImageTk
-from selenium import webdriver
 import webview
+from folium.plugins import MarkerCluster
+from itertools import chain
 
 
 
@@ -50,7 +43,7 @@ df['EventCount'] = df.groupby('ID').cumcount() + 1
 output_data = []
 for id, group in df.groupby('ID'):
     time_lag_pairs = group[['LagTime', 'Event']].values
-    output_data.append([id, group.iloc[0]['Name']] + time_lag_pairs.flatten().tolist())
+    output_data.append([id, group.iloc[0]['Name']] + list(chain.from_iterable(time_lag_pairs)))
 
 # Sort the output data based on the 'EventCount' and 'EventPath' columns
 output_data_sorted = sorted(output_data, key=lambda x: (len(x[2:]), ''.join(x[3::2])))
@@ -73,7 +66,8 @@ def retrieve_user_paths(df):
 
 
 def generate_nodes_links(user_paths):
-    nodes = []
+    nodes = []  # Keep this as a list
+    nodes_set = set()  # Use a set for efficient membership checking
     links = {'source': [], 'target': [], 'value': [], 'label': [], 'customdata': [], 'color':[]}
 
     colors = list(mcolors.CSS4_COLORS.keys())  # Get a list of available color names
@@ -86,11 +80,13 @@ def generate_nodes_links(user_paths):
             color_dict[path_str] = colors.pop()  # Assign and remove one from the list
 
         for i in range(len(user['path']) - 1):
-            if user['path'][i] not in nodes:
+            if user['path'][i] not in nodes_set:
                 nodes.append(user['path'][i])
+                nodes_set.add(user['path'][i])
 
-            if user['path'][i + 1] not in nodes:
+            if user['path'][i + 1] not in nodes_set:
                 nodes.append(user['path'][i + 1])
+                nodes_set.add(user['path'][i + 1])
 
             links['source'].append(nodes.index(user['path'][i]))
             links['target'].append(nodes.index(user['path'][i + 1]))
@@ -289,7 +285,7 @@ class Application:
             print(f"Error geolocating {location_str}: {e}")
             return np.nan, np.nan  # return NaN if there's an error
 
-    import webview
+
 
     def create_map(self):
         self.location_counts['Latitude'] = pd.to_numeric(self.location_counts['Latitude'], errors='coerce')
@@ -313,7 +309,9 @@ class Application:
         tile.add_to(m)
 
         # Add a heatmap to the map
-        HeatMap(data=self.location_counts[['Latitude', 'Longitude', 'Counts']].dropna(), radius=8).add_to(m)
+        HeatMap(data=self.location_counts[['Latitude', 'Longitude', 'Counts']].dropna(), radius=15, max_zoom=10).add_to(m)
+
+        marker_cluster = MarkerCluster().add_to(m)
 
         # Add markers to the map
         for index, row in self.location_counts.iterrows():
@@ -324,7 +322,7 @@ class Application:
                 fill=True,
                 fill_color="red",
                 tooltip=f"Lat: {row['Latitude']}, Lon: {row['Longitude']}"
-            ).add_to(m)
+            ).add_to(marker_cluster)
 
         # Save the map as an HTML string
         map_html = m._repr_html_()
