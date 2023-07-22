@@ -1,22 +1,25 @@
-import PIL
-import time
-import pandas as pd
 import csv
-from datetime import datetime
-import tkinter as tk
-from tkinter import StringVar, OptionMenu, Label, Button, Text
-import matplotlib.colors as mcolors
-import plotly.graph_objects as go
 import re
-from folium.plugins import HeatMap
-import folium
-import numpy as np
-from geopy.geocoders import Nominatim
-import webview
-from folium.plugins import MarkerCluster
+import time
+import tkinter as tk
+import webbrowser
+from datetime import datetime
 from itertools import chain
+from tkinter import StringVar, OptionMenu, Label, Button, Text
 
-
+import folium
+import matplotlib.colors as mcolors
+import numpy as np
+import openrouteservice
+import pandas as pd
+import plotly.graph_objects as go
+import webview
+from folium import Marker
+from folium.plugins import HeatMap
+from folium.plugins import MarkerCluster
+from openrouteservice.directions import directions
+from geopy.distance import geodesic
+from geopy.geocoders import Nominatim
 
 color_list = ['blue', 'green', 'red', 'yellow', 'purple', 'orange', 'pink', 'brown', 'cyan', 'magenta']
 color_dict = {}
@@ -206,6 +209,9 @@ class Application:
         self.heatmap_button = Button(master, text="Show Heatmap", command=self.create_map)
         self.heatmap_button.pack()
 
+        self.drive_time_button = Button(master, text="Open Drive Time", command=self.calculate_drive_time)
+        self.drive_time_button.pack()
+
         # Control variable for the End In mode
         self.end_in_mode = False
 
@@ -330,6 +336,49 @@ class Application:
         # Create a new webview window with the map HTML
         webview.create_window('Map', html=map_html)
         webview.start()
+
+    def calculate_drive_time(self):
+        # Define the warehouse location (you should replace these coordinates with your actual warehouse location)
+        warehouse_coords = [39.047900, -77.114080]
+
+        # Create a new folium map centered at the warehouse location
+        m = folium.Map(location=warehouse_coords, zoom_start=5, zoom_control=True, tiles='OpenStreetMap')
+
+        # Add a marker for the warehouse location
+        Marker(warehouse_coords, popup="Warehouse").add_to(m)
+
+
+        # Set up the openrouteservice client (replace 'your-api-key' with your actual API key)
+        client = openrouteservice.Client(key='5b3ce3597851110001cf6248d3b6653cdffb4a26977343a5ebebc5fb')
+
+        # Iterate over the purchase data
+        for index, row in self.purchase_data.iterrows():
+            if row['Event'] == 'Summary':
+                # Get the buyer location
+                buyer_coords = [row['Latitude'], row['Longitude']]  # Note the order of the coordinates
+
+                # Calculate and print out the distance
+                distance = geodesic(warehouse_coords, buyer_coords).meters
+                print(f"Distance: {distance} meters")
+
+                # Calculate the route from the warehouse to the buyer location
+                route = client.directions([warehouse_coords, buyer_coords], radiuses=[-1, -1])
+
+
+                # Get the drive time in minutes
+                drive_time = route['routes'][0]['Summary']['duration'] / 60
+
+                # Add a marker for the buyer location with the drive time in the popup
+                Marker(buyer_coords, popup=f"Drive Time: {drive_time:.2f} minutes").add_to(m)
+
+                # Draw the route on the map
+                folium.PolyLine(
+                    locations=[list(reversed(coord)) for coord in route['routes'][0]['geometry']['coordinates']],
+                    color='blue').add_to(m)
+
+        # Display the map
+        m.save('drive_time_map.html')
+        webbrowser.open('drive_time_map.html')
 
 
 root = tk.Tk()
