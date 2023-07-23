@@ -344,7 +344,13 @@ class Application:
         warehouse_coords = [39.048231, -77.113589]
 
         m = folium.Map(location=warehouse_coords, zoom_start=5, zoom_control=True, tiles='OpenStreetMap')
-        folium.Marker(warehouse_coords, popup="Warehouse", icon=folium.Icon(color='red', icon='home', prefix='fa'), icon_color='white', icon_size=(40, 40)).add_to(m)
+
+        # Create a MarkerCluster object
+        marker_cluster = MarkerCluster()
+
+        # Add the warehouse marker with custom color and size
+        folium.Marker(warehouse_coords, popup="Warehouse", icon=folium.Icon(color='red', icon='home', prefix='fa'),
+                      icon_color='white', icon_size=(40, 40)).add_to(marker_cluster)
 
         client = openrouteservice.Client(key='5b3ce3597851110001cf6248d3b6653cdffb4a26977343a5ebebc5fb')
 
@@ -362,7 +368,16 @@ class Application:
                     continue
 
                 drive_time = route['routes'][0]['summary']['duration'] / 60
-                folium.Marker(buyer_coords, popup=f"Drive Time: {drive_time:.2f} minutes").add_to(m)
+
+
+                # Get the 'id' and 'name' from the row
+                buyer_id = row['ID']
+                buyer_name = row['Name']
+
+                # Create a string with the drive time, id, and name
+                popup_text = f"Drive Time: {drive_time:.2f} minutes<br>ID: {buyer_id}<br>Name: {buyer_name}"
+
+                folium.Marker(buyer_coords, popup=popup_text).add_to(marker_cluster)
                 print(route)
 
                 # Decode the polyline to get the coordinates
@@ -374,6 +389,9 @@ class Application:
                 folium.PolyLine(
                     locations=locations,
                     color='blue').add_to(m)
+
+        # Add the MarkerCluster object to the map
+        marker_cluster.add_to(m)
 
         m.save('drive_time_map.html')
         webbrowser.open_new_tab('file://' + os.path.abspath('drive_time_map.html'))
