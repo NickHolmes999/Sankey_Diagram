@@ -3,6 +3,7 @@ import re
 import time
 import tkinter as tk
 import webbrowser
+import os
 from datetime import datetime
 from itertools import chain
 from tkinter import StringVar, OptionMenu, Label, Button, Text
@@ -17,9 +18,11 @@ import webview
 from folium import Marker
 from folium.plugins import HeatMap
 from folium.plugins import MarkerCluster
-from openrouteservice.directions import directions
+import openrouteservice.exceptions
+import openrouteservice.directions
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
+from polyline import polyline
 
 color_list = ['blue', 'green', 'red', 'yellow', 'purple', 'orange', 'pink', 'brown', 'cyan', 'magenta']
 color_dict = {}
@@ -338,47 +341,42 @@ class Application:
         webview.start()
 
     def calculate_drive_time(self):
-        # Define the warehouse location (you should replace these coordinates with your actual warehouse location)
-        warehouse_coords = [39.047900, -77.114080]
+        warehouse_coords = [39.048231, -77.113589]
 
-        # Create a new folium map centered at the warehouse location
         m = folium.Map(location=warehouse_coords, zoom_start=5, zoom_control=True, tiles='OpenStreetMap')
+        folium.Marker(warehouse_coords, popup="Warehouse", icon=folium.Icon(color='red', icon='home', prefix='fa'), icon_color='white', icon_size=(40, 40)).add_to(m)
 
-        # Add a marker for the warehouse location
-        Marker(warehouse_coords, popup="Warehouse").add_to(m)
-
-
-        # Set up the openrouteservice client (replace 'your-api-key' with your actual API key)
         client = openrouteservice.Client(key='5b3ce3597851110001cf6248d3b6653cdffb4a26977343a5ebebc5fb')
 
-        # Iterate over the purchase data
         for index, row in self.purchase_data.iterrows():
             if row['Event'] == 'Summary':
-                # Get the buyer location
-                buyer_coords = [row['Latitude'], row['Longitude']]  # Note the order of the coordinates
+                buyer_coords = [row['Latitude'], row['Longitude']]
 
-                # Calculate and print out the distance
                 distance = geodesic(warehouse_coords, buyer_coords).meters
                 print(f"Distance: {distance} meters")
 
-                # Calculate the route from the warehouse to the buyer location
-                route = client.directions([warehouse_coords, buyer_coords], radiuses=[-1, -1])
+                try:
+                    route = client.directions([warehouse_coords[::-1], buyer_coords[::-1]], radiuses=[350, 350])
+                except openrouteservice.exceptions.ApiError as e:
+                    print(f"Error calculating route for coordinates {warehouse_coords} and {buyer_coords}: {e}")
+                    continue
 
+                drive_time = route['routes'][0]['summary']['duration'] / 60
+                folium.Marker(buyer_coords, popup=f"Drive Time: {drive_time:.2f} minutes").add_to(m)
+                print(route)
 
-                # Get the drive time in minutes
-                drive_time = route['routes'][0]['Summary']['duration'] / 60
+                # Decode the polyline to get the coordinates
+                geometry = route['routes'][0]['geometry']
+                coords = polyline.decode(geometry)
+                # Reverse each coordinate and build the locations list
+                locations = [list(reversed(coord)) for coord in coords]
 
-                # Add a marker for the buyer location with the drive time in the popup
-                Marker(buyer_coords, popup=f"Drive Time: {drive_time:.2f} minutes").add_to(m)
-
-                # Draw the route on the map
                 folium.PolyLine(
-                    locations=[list(reversed(coord)) for coord in route['routes'][0]['geometry']['coordinates']],
+                    locations=locations,
                     color='blue').add_to(m)
 
-        # Display the map
         m.save('drive_time_map.html')
-        webbrowser.open('drive_time_map.html')
+        webbrowser.open_new_tab('file://' + os.path.abspath('drive_time_map.html'))
 
 
 root = tk.Tk()
