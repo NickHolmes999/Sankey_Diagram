@@ -26,7 +26,17 @@ color_list = ['blue', 'green', 'red', 'yellow', 'purple', 'orange', 'pink', 'bro
 color_dict = {}
 def concat_events(series):
     return ''.join(series)
-# Read the Excel file into a Pandas DataFrame object
+# Read the Excel file again into a new DataFrame
+df_original = pd.read_excel('venv/PythonExcelExample.xlsx')
+df_original['Purchased Item'] = df_original['Event'].shift(+2).str.strip()
+
+# Filter out the rows where the 'Event' column is 'Summary'
+df_purchases = df_original[df_original['Event'] == 'Summary']
+top_selling_items = df_purchases['Purchased Item'].value_counts().nlargest(10)
+
+# Filter out the events that are not 'Summary'
+df_summary_original = df_original[df_original['Event'] == 'Summary']
+
 df = pd.read_excel('venv/PythonExcelExample.xlsx')
 # Convert 'Time' column to datetime.timedelta objects
 df['Time'] = df['Time'].apply(lambda x: datetime.combine(datetime.min, x) - datetime.min)
@@ -125,7 +135,8 @@ def create_sankey(df):
 ##########################################################################################################
 # Create a new DataFrame from the rows containing 'summary'
 purchase_data = df[df['Event'] == 'Summary'].copy()
-geolocator = Nominatim(user_agent="Nick-Holmes_Practice")
+geolocator = Nominatim(user_agent="Nick-Holmes_Practice", timeout=15)
+client = openrouteservice.Client(key='5b3ce3597851110001cf6248d3b6653cdffb4a26977343a5ebebc5fb')
 class Application:
     def __init__(self, master, geolocator, purchase_data):
         self.master = master
@@ -174,6 +185,17 @@ class Application:
             purchase_data['Latitude'], purchase_data['Longitude'] = np.nan, np.nan
         # Count the frequency of each location
         self.location_counts = purchase_data.groupby(['Latitude', 'Longitude']).size().reset_index(name='Counts')
+
+
+        # Compute the statistics
+        self.most_common_city = df_summary_original['City'].mode()[0]
+        self.most_common_region = df_summary_original['Region'].mode()[0]
+
+        # Extract the hour from the 'Time' column
+        self.most_common_hour = df_summary_original['Time'].apply(lambda x: x.hour)
+        self.most_common_hour = self.hour_to_string(self.most_common_hour.mode()[0])
+        self.stats_button = tk.Button(self.master, text="Show stats", command=self.show_stats)
+        self.stats_button.pack()
     def add_to_search_path(self):
         self.search_path.append(self.selected_option.get())
         self.search_label_string.set(' > '.join(self.search_path))
@@ -317,6 +339,25 @@ class Application:
 
         m.save('drive_time_map.html')
         webbrowser.open_new_tab('file://' + os.path.abspath('drive_time_map.html'))
+
+    def show_stats(self):
+        stats_window = tk.Toplevel(self.master)
+        stats_label = tk.Label(stats_window, text=f'Most common city: {self.most_common_city}\n'
+                                                  f'Most common region: {self.most_common_region}\n'
+                                                  f'Most common hour: {self.most_common_hour}\n'
+                                                  f'Most popular item: {top_selling_items.index[0]}\n'
+                                                  f'Second most popular item: {top_selling_items.index[1]}\n')
+        stats_label.pack()
+
+    def hour_to_string(self, hour):
+        if 0 <= hour < 6:
+            return 'Night'
+        elif 6 <= hour < 12:
+            return 'Morning'
+        elif 12 <= hour < 18:
+            return 'Afternoon'
+        else:
+            return 'Evening'
 
 root = tk.Tk()
 app = Application(root, geolocator, purchase_data)
