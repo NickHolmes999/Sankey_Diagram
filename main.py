@@ -190,6 +190,8 @@ class Application:
         # Compute the statistics
         self.most_common_city = df_summary_original['City'].mode()[0]
         self.most_common_region = df_summary_original['Region'].mode()[0]
+        self.most_common_country = df_summary_original['Country'].mode()[0]
+        self.most_common_race = df_summary_original['Race'].mode()[0]
 
         # Extract the hour from the 'Time' column
         self.most_common_hour = df_summary_original['Time'].apply(lambda x: x.hour)
@@ -344,7 +346,9 @@ class Application:
         stats_window = tk.Toplevel(self.master)
         stats_label = tk.Label(stats_window, text=f'Most common city: {self.most_common_city}\n'
                                                   f'Most common region: {self.most_common_region}\n'
+                                                  f'Most common country: {self.most_common_country}\n'
                                                   f'Most common hour: {self.most_common_hour}\n'
+                                                  f'Most common race: {self.most_common_race}\n'
                                                   f'Most popular item: {top_selling_items.index[0]}\n'
                                                   f'Second most popular item: {top_selling_items.index[1]}\n')
         stats_label.pack()
