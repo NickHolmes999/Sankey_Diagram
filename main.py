@@ -125,7 +125,7 @@ def create_sankey(df):
             dict(
                 text=f"Path: {dashed_path}, Count: {count}",
                 xref="paper", yref="paper",
-                x=0.95, y=(1 - 0.1 * i),  # Positions to stack annotations nicely
+                x=0.95, y=(1 - 0.05 * i),  # Positions to stack annotations nicely
                 showarrow=False
             )
         )
