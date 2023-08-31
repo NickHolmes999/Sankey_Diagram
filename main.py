@@ -22,6 +22,16 @@ import openrouteservice.directions
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 from polyline import polyline
+import geopandas as gpd
+from shapely.geometry import Point, Polygon
+import geojson
+import h3
+from shapely.geometry import Polygon
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+
 color_list = ['blue', 'green', 'red', 'yellow', 'purple', 'orange', 'pink', 'brown', 'cyan', 'magenta']
 color_dict = {}
 def concat_events(series):
@@ -301,6 +311,39 @@ class Application:
 
         client = openrouteservice.Client(key='5b3ce3597851110001cf6248d3b6653cdffb4a26977343a5ebebc5fb')
 
+        # Create a GeoDataFrame from your DataFrame
+        gdf = gpd.GeoDataFrame(
+            self.purchase_data, geometry=gpd.points_from_xy(self.purchase_data.Longitude, self.purchase_data.Latitude)
+        )
+
+        # Convert latitude and longitude to H3 hexagons
+        self.purchase_data['h3'] = self.purchase_data.apply(
+            lambda row: h3.geo_to_h3(row['Latitude'], row['Longitude'], resolution=7), axis=1)
+
+        # Group by the 'h3' column and count the number of points in each bin
+        hexbins = self.purchase_data.groupby('h3').size().reset_index(name='count')
+
+        # Convert the 'h3' column back to latitude and longitude
+        hexbins['geometry'] = hexbins['h3'].apply(lambda x: Polygon(h3.h3_to_geo_boundary(x, geo_json=True)))
+
+        # Convert the DataFrame to a GeoDataFrame
+        hexbins = gpd.GeoDataFrame(hexbins, geometry='geometry')
+
+        # Normalize the count column to get values between 0 and 1
+        hexbins['count_normalized'] = (hexbins['count'] - hexbins['count'].min()) / (
+                hexbins['count'].max() - hexbins['count'].min())
+
+        # Import the necessary libraries
+        import matplotlib.cm as cm
+        import matplotlib.colors as colors
+
+        # Define the colormap to use
+        colormap = cm.get_cmap('coolwarm', len(hexbins))
+
+        # Calculate the maximum count of points
+        max_count = hexbins['count'].max()
+        min_count = hexbins['count'].min()
+
         for index, row in self.purchase_data.iterrows():
             if row['Event'] == 'Summary':
                 buyer_coords = [row['Latitude'], row['Longitude']]
@@ -336,7 +379,27 @@ class Application:
                     locations=locations,
                     color='blue').add_to(m)
 
-        # Add the MarkerCluster object to the map
+        for idx, row in hexbins.iterrows():
+            # Create a GeoJSON polygon
+            polygon = geojson.Polygon([list(row.geometry.exterior.coords)])
+
+            # Count the number of points within the polygon
+            points_in_polygon = row['count']
+            print(f"Polygon {idx + 1} contains {points_in_polygon} points.")
+
+            # Calculate the color based on the count
+            color = colors.rgb2hex(colormap(row['count']))
+
+            # Convert the color to hex format
+            hex_color = colors.to_hex(color)
+
+            # Add the polygon to the map
+            folium.GeoJson(
+                polygon,
+                name='geojson',
+                style_function=lambda x: {'fillColor': hex_color},
+            ).add_to(m)
+
         marker_cluster.add_to(m)
 
         m.save('drive_time_map.html')
