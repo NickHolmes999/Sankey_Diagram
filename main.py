@@ -1,36 +1,32 @@
 import csv
+import os
 import re
 import time
 import tkinter as tk
 import webbrowser
-import os
 from datetime import datetime
 from itertools import chain
 from tkinter import StringVar, OptionMenu, Label, Button, Text
+
 import folium
+import geojson
+import geopandas as gpd
+import h3
+import matplotlib
 import matplotlib.colors as mcolors
 import numpy as np
 import openrouteservice
+import openrouteservice.directions
+import openrouteservice.exceptions
 import pandas as pd
 import plotly.graph_objects as go
 import webview
-from folium import Marker
 from folium.plugins import HeatMap
 from folium.plugins import MarkerCluster
-import openrouteservice.exceptions
-import openrouteservice.directions
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 from polyline import polyline
-import geopandas as gpd
-from shapely.geometry import Point, Polygon
-import geojson
-import h3
 from shapely.geometry import Polygon
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import matplotlib.cm as cm
-import matplotlib.colors as colors
 
 color_list = ['blue', 'green', 'red', 'yellow', 'purple', 'orange', 'pink', 'brown', 'cyan', 'magenta']
 color_dict = {}
@@ -334,15 +330,25 @@ class Application:
                 hexbins['count'].max() - hexbins['count'].min())
 
         # Import the necessary libraries
-        import matplotlib.cm as cm
         import matplotlib.colors as colors
 
         # Define the colormap to use
-        colormap = cm.get_cmap('coolwarm', len(hexbins))
+        colormap = matplotlib.cm.get_cmap('coolwarm') # without `len(hexbins)`
+
+
 
         # Calculate the maximum count of points
         max_count = hexbins['count'].max()
         min_count = hexbins['count'].min()
+
+        # Define the number of bins
+        num_bins = 10
+
+        # Create the bins
+        bins = np.linspace(hexbins['count'].min(), hexbins['count'].max(), num_bins)
+
+        # Categorize the counts into the bins
+        hexbins['count_bin'] = np.digitize(hexbins['count'], bins)
 
         for index, row in self.purchase_data.iterrows():
             if row['Event'] == 'Summary':
@@ -387,17 +393,15 @@ class Application:
             points_in_polygon = row['count']
             print(f"Polygon {idx + 1} contains {points_in_polygon} points.")
 
-            # Calculate the color based on the count
-            color = colors.rgb2hex(colormap(row['count']))
+            # Calculate the color based on the count_normalized
+            color = colors.rgb2hex(colormap(row['count_bin']/num_bins))
 
-            # Convert the color to hex format
-            hex_color = colors.to_hex(color)
 
             # Add the polygon to the map
             folium.GeoJson(
                 polygon,
                 name='geojson',
-                style_function=lambda x: {'fillColor': hex_color},
+                style_function=lambda x: {'fillColor': color},
             ).add_to(m)
 
         marker_cluster.add_to(m)
