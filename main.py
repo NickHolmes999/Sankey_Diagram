@@ -13,6 +13,7 @@ import geojson
 import geopandas as gpd
 import h3
 import matplotlib
+import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import numpy as np
 import openrouteservice
@@ -27,6 +28,7 @@ from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 from polyline import polyline
 from shapely.geometry import Polygon
+
 
 color_list = ['blue', 'green', 'red', 'yellow', 'purple', 'orange', 'pink', 'brown', 'cyan', 'magenta']
 color_dict = {}
@@ -204,9 +206,13 @@ class Application:
         self.most_common_hour = self.hour_to_string(self.most_common_hour.mode()[0])
         self.stats_button = tk.Button(self.master, text="Show stats", command=self.show_stats)
         self.stats_button.pack()
+
+
     def add_to_search_path(self):
         self.search_path.append(self.selected_option.get())
         self.search_label_string.set(' > '.join(self.search_path))
+
+
     def remove_last(self):
         if self.search_path:
             self.search_path.pop()
@@ -328,12 +334,14 @@ class Application:
         # Normalize the count column to get values between 0 and 1
         hexbins['count_normalized'] = (hexbins['count'] - hexbins['count'].min()) / (
                 hexbins['count'].max() - hexbins['count'].min())
+        hexbins['count_mapped'] = np.interp(hexbins['count'], (hexbins['count'].min(), hexbins['count'].max()),
+                                            (0, 255))
 
         # Import the necessary libraries
-        import matplotlib.colors as colors
 
         # Define the colormap to use
-        colormap = matplotlib.cm.get_cmap('coolwarm') # without `len(hexbins)`
+        colormap = cm.get_cmap('viridis')
+
 
 
 
@@ -368,9 +376,10 @@ class Application:
                 # Get the 'id' and 'name' from the row
                 buyer_id = row['ID']
                 buyer_name = row['Name']
+                buyer_race = row['Race']
 
                 # Create a string with the drive time, id, and name
-                popup_text = f"Drive Time: {drive_time:.2f} minutes<br>ID: {buyer_id}<br>Name: {buyer_name}"
+                popup_text = f"Drive Time: {drive_time:.2f} minutes<br>ID: {buyer_id}<br>Name: {buyer_name}<br>Race: {buyer_race}"
 
                 folium.Marker(buyer_coords, popup=popup_text).add_to(marker_cluster)
                 print(route)
@@ -387,21 +396,35 @@ class Application:
 
         for idx, row in hexbins.iterrows():
             # Create a GeoJSON polygon
-            polygon = geojson.Polygon([list(row.geometry.exterior.coords)])
+            polygon = row['geometry']  # Modify this line to use the 'geometry' column from the DataFrame
 
             # Count the number of points within the polygon
             points_in_polygon = row['count']
             print(f"Polygon {idx + 1} contains {points_in_polygon} points.")
 
-            # Calculate the color based on the count_normalized
-            color = colors.rgb2hex(colormap(row['count_bin']/num_bins))
-
+            # Calculate the color based on the count_mapped
+            if points_in_polygon == 1:
+                color = 'yellow'
+            elif points_in_polygon == 2:
+                color = 'orange'
+            elif points_in_polygon == 3:
+                color = 'red'
+            else:
+                color = 'blue'
+            print('count_mapped:', row['count_mapped'])
+            print('color:', color)
 
             # Add the polygon to the map
             folium.GeoJson(
                 polygon,
                 name='geojson',
-                style_function=lambda x: {'fillColor': color},
+                style_function=lambda x, color=color: {
+                    'fillColor': color,
+                    'color': color,
+                    'weight': 1,
+                    'fillOpacity': 0.5
+                },
+                tooltip=f"Count: {points_in_polygon}"
             ).add_to(m)
 
         marker_cluster.add_to(m)
@@ -417,7 +440,9 @@ class Application:
                                                   f'Most common hour: {self.most_common_hour}\n'
                                                   f'Most common race: {self.most_common_race}\n'
                                                   f'Most popular item: {top_selling_items.index[0]}\n'
-                                                  f'Second most popular item: {top_selling_items.index[1]}\n')
+                                                  f'Second most popular item: {top_selling_items.index[1]}\n'
+                                                  f'Third most popular item: {top_selling_items.index[2]}\n')
+
         stats_label.pack()
 
     def hour_to_string(self, hour):
