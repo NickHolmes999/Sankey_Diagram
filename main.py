@@ -151,7 +151,7 @@ purchase_data = df[df['Event'] == 'Summary'].copy()
 geolocator = Nominatim(user_agent="Nick-Holmes_Practice", timeout=15)
 client = openrouteservice.Client(key='5b3ce3597851110001cf6248d3b6653cdffb4a26977343a5ebebc5fb')
 class Application:
-    def __init__(self, master, geolocator, purchase_data):
+    def __init__(self, master, geolocator, purchase_data, selected_city="All Cities"):
         self.master = master
         self.master.title("Excel Sheet Analysis")
         self.geolocator = geolocator
@@ -174,6 +174,13 @@ class Application:
         self.end_in_button = Button(master, text="End In", command=self.toggle_end_in)
         self.end_in_button.configure(relief="raised")
         self.end_in_button.pack()
+        self.city_options = sorted(set(df['City']))
+        self.selected_city_var = StringVar(master)
+        self.selected_city_var.set("All Cities")  # Initial value
+        self.selected_city = selected_city
+        self.city_dropdown_menu = OptionMenu(master, self.selected_city_var, *self.city_options,
+                                             command=self.update_selected_city)
+        self.city_dropdown_menu.pack()
         self.search_button = Button(master, text="Search", command=self.search)
         self.search_button.pack()
         self.results_text = Text(master)
@@ -222,6 +229,9 @@ class Application:
         if self.search_path:
             self.search_path.pop()
             self.search_label_string.set(' > '.join(self.search_path))
+
+    def update_selected_city(self, selected_city):
+        self.selected_city = selected_city
     def clear_search_path(self):
         self.search_path.clear()
         self.search_label_string.set('')
@@ -236,13 +246,15 @@ class Application:
         print(f"Searching, end_in_mode: {self.end_in_mode}, search_path: {self.search_path}")  # Debug Print
         self.results_text.delete(1.0, 'end')
         all_results = sorted(
-            [(len(set(self.search_path).difference(set(row[3::2]))), row)
-             for row in output_data
-             if any(event in self.search_path for event in row[3::2]) and
-             (not self.end_in_mode or
-              (len(self.search_path) <= len(row[3::2]) and
-               tuple(row[3::2][-len(self.search_path):]) == tuple(self.search_path)))
-             ],
+            [
+                (len(set(self.search_path).difference(set(row[3::2]))), row)
+                for row in output_data
+                if any(event in self.search_path for event in row[3::2]) and
+                   (not self.end_in_mode or
+                    (len(self.search_path) <= len(row[3::2]) and
+                     tuple(row[3::2][-len(self.search_path):]) == tuple(self.search_path))) and
+                   (self.selected_city == "All Cities" or row[-1] == self.selected_city)
+            ],
             key=lambda x: x[0]
         )
         for num_diff, result in all_results:
