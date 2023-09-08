@@ -60,6 +60,11 @@ output_data = []
 for id, group in df.groupby('ID'):
     time_lag_pairs = group[['LagTime', 'Event']].values
     output_data.append([id, group.iloc[0]['Name']] + list(chain.from_iterable(time_lag_pairs)))
+for sublist in output_data:
+    id_value = sublist[0]
+    matching_row = df[df['ID'] == id_value]
+    city_value = matching_row['City'].values[0]
+    sublist.append(city_value)
 # Sort the output data based on the 'EventCount' and 'EventPath' columns
 output_data_sorted = sorted(output_data, key=lambda x: (len(x[2:]), ''.join(x[3::2])))
 # Write the resulting output data to a CSV file
