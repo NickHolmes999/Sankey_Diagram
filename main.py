@@ -12,6 +12,7 @@ import folium
 import geojson
 import geopandas as gpd
 import h3
+from folium import IFrame
 import matplotlib
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
@@ -316,6 +317,8 @@ class Application:
         webview.create_window('Map', html=map_html)
         webview.start()
 
+    from folium import IFrame
+
     def calculate_drive_time(self):
         warehouse_coords = [39.048231, -77.113589]
 
@@ -359,9 +362,6 @@ class Application:
         # Define the colormap to use
         colormap = cm.get_cmap('viridis')
 
-
-
-
         # Calculate the maximum count of points
         max_count = hexbins['count'].max()
         min_count = hexbins['count'].min()
@@ -374,6 +374,8 @@ class Application:
 
         # Categorize the counts into the bins
         hexbins['count_bin'] = np.digitize(hexbins['count'], bins)
+
+        drive_times = []  # List to store drive times
 
         for index, row in self.purchase_data.iterrows():
             if row['Event'] == 'Summary':
@@ -389,16 +391,32 @@ class Application:
                     continue
 
                 drive_time = route['routes'][0]['summary']['duration'] / 60
+                drive_times.append(drive_time)  # Add drive time to the list
+
+                # Calculate the total distance of the route in kilometers
+                total_distance = route['routes'][0]['summary']['distance'] / 1000
+
+                # Assume an average fuel efficiency of 12.75 kmpl
+                average_fuel_efficiency = 12.75
+
+                # Calculate the estimated fuel consumption in liters
+                estimated_fuel_consumption = total_distance / average_fuel_efficiency
 
                 # Get the 'id' and 'name' from the row
                 buyer_id = row['ID']
                 buyer_name = row['Name']
                 buyer_race = row['Race']
 
-                # Create a string with the drive time, id, and name
-                popup_text = f"Drive Time: {drive_time:.2f} minutes<br>ID: {buyer_id}<br>Name: {buyer_name}<br>Race: {buyer_race}"
+                # Create a string with the drive time, total distance, estimated fuel consumption, id, and name
+                popup_text = f"Drive Time: {drive_time:.2f} minutes<br>Total Distance: {total_distance:.2f} km<br>Estimated Fuel Consumption: {estimated_fuel_consumption:.2f} liters<br>ID: {buyer_id}<br>Name: {buyer_name}<br>Race: {buyer_race}"
 
-                folium.Marker(buyer_coords, popup=popup_text).add_to(marker_cluster)
+                # Create an IFrame with the popup_text as content
+                iframe = IFrame(popup_text, width=300, height=100)
+
+                # Create a Popup with the IFrame as content
+                popup = folium.Popup(iframe, max_width=2650)
+
+                folium.Marker(buyer_coords, popup=popup).add_to(marker_cluster)
                 print(route)
 
                 # Decode the polyline to get the coordinates
@@ -446,6 +464,27 @@ class Application:
 
         marker_cluster.add_to(m)
 
+        # Calculate statistics for drive times
+        average_drive_time = np.mean(drive_times)
+        median_drive_time = np.median(drive_times)
+        std_dev_drive_time = np.std(drive_times)
+
+        # Create a string with the statistics
+        stats_text = f"Average Drive Time: {average_drive_time:.2f} minutes<br>Median Drive Time: {median_drive_time:.2f} minutes<br>Standard Deviation of Drive Time: {std_dev_drive_time:.2f} minutes"
+
+        # Create an IFrame with the stats_text as content
+        stats_iframe = IFrame(stats_text, width=300, height=100)
+
+        # Create a Popup with the stats_iframe as content
+        stats_popup = folium.Popup(stats_iframe, max_width=2650)
+
+        # Add the statistics popup to the top right corner of the map
+        folium.Marker(
+            location=[m.get_bounds()[1][0], m.get_bounds()[0][1]],
+            popup=stats_popup,
+            icon=folium.Icon(icon='info-sign', prefix='fa', color='blue')
+        ).add_to(m)
+
         m.save('drive_time_map.html')
         webbrowser.open_new_tab('file://' + os.path.abspath('drive_time_map.html'))
 
@@ -465,10 +504,14 @@ class Application:
     def hour_to_string(self, hour):
         if 0 <= hour < 6:
             return 'Night'
-        elif 6 <= hour < 12:
+        elif 6 <= hour < 10:
             return 'Morning'
-        elif 12 <= hour < 18:
+        elif 10 <= hour < 12:
+            return 'Late Morning'
+        elif 12 <= hour < 14:
             return 'Afternoon'
+        elif 14 <= hour < 18:
+            return 'Late Afternoon'
         else:
             return 'Evening'
 
